@@ -1,5 +1,11 @@
 __pycache__/
 *.pyc
-*.log
 .env
-*.json
+*.log
+
+# data (optional – choose wisely)
+data/*.json
+
+# OS junk
+.DS_Store
+Thumbs.db
