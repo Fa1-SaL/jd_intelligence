@@ -101,6 +101,23 @@ def upsert_job(record: dict):
 # Data Cleaning Helpers
 # ---------------------------------------------------------------------------
 
+def has_changed(existing, new):
+    fields_to_check = [
+        "job_title",
+        "compensation_min",
+        "compensation_max",
+        "compensation_type",
+        "compensation_range",
+        "hires_this_month",
+        "job_description",
+        "referral_bonus",
+        "job_url"
+    ]
+    for field in fields_to_check:
+        if existing.get(field) != new.get(field):
+            return True
+    return False
+
 def is_incomplete(record: dict) -> bool:
     """A record is INCOMPLETE if any of the required fields are missing."""
     jd = record.get("job_description")
@@ -142,6 +159,12 @@ def derive_job_id(listing: dict) -> str:
 def parse_compensation(listing: dict) -> dict:
     rate_min = listing.get("rateMin")
     rate_max = listing.get("rateMax")
+    
+    if rate_min is None and rate_max is not None:
+        rate_min = rate_max
+    if rate_max is None and rate_min is not None:
+        rate_max = rate_min
+
     frequency = listing.get("payRateFrequency", "")
     commitment = listing.get("commitment", "")
     comp_type = frequency.lower() if frequency else None
@@ -201,7 +224,6 @@ def clean_listing(listing: dict, description: str | None = None) -> dict:
         "job_description": strip_html(description),
         "referral_bonus": parse_referral(listing),
         "job_url": url,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -305,15 +327,6 @@ def scrape_mercor_jobs(headless: bool = True, dry_run: bool = False) -> dict:
             title = listing.get("title") or "Untitled"
             listing_id = derive_job_id(listing)
 
-            # A. Fetch existing record via Supabase HTTP
-            existing_record = fetch_existing_job(listing_id)
-
-            # B/C. Evaluate Completeness
-            if existing_record and not is_incomplete(existing_record):
-                print(f"  [{i}/{total}] SKIP (Complete) {title[:50]:52s}")
-                stats["skipped"] += 1
-                continue
-
             # Need to scrape JD
             description = ""
             for attempt in range(MAX_RETRIES):
@@ -345,8 +358,22 @@ def scrape_mercor_jobs(headless: bool = True, dry_run: bool = False) -> dict:
 
             record = clean_listing(listing, description)
 
+            existing_record = fetch_existing_job(listing_id)
+
+            if existing_record:
+                if not has_changed(existing_record, record):
+                    print(f"  [{i}/{total}] SKIP (No Change) {title[:50]:52s}")
+                    stats["skipped"] += 1
+                    continue
+                else:
+                    action = "updated"
+            else:
+                action = "inserted"
+                
+            record["updated_at"] = datetime.now(timezone.utc).isoformat()
+
             if dry_run:
-                if existing_record:
+                if action == "updated":
                     stats["updated"] += 1
                 else:
                     stats["inserted"] += 1
@@ -356,7 +383,7 @@ def scrape_mercor_jobs(headless: bool = True, dry_run: bool = False) -> dict:
             # Upsert into Supabase
             try:
                 upsert_job(record)
-                if existing_record:
+                if action == "updated":
                     stats["updated"] += 1
                     print(f"  [{i}/{total}] UPDATED {title[:55]:57s}")
                 else:
@@ -387,7 +414,8 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Scrape only, skip Supabase upload")
     args = parser.parse_args()
 
-    stats = scrape_mercor_jobs(headless=not args.visible, dry_run=args.dry_run)
+    stats = scrape_mercor_jobs(headless=not.
+    args.visible, dry_run=args.dry_run)
 
     print("\n" + "=" * 50)
     print("  SCRAPE COMPLETED STATUS")

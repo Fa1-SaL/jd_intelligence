@@ -2,13 +2,13 @@ from openai import OpenAI
 
 client = OpenAI(api_key="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")
 
-text = """Software Expert (CAD and Engineering)
+text = """Generalist Expert
 Hourly contract
 Remote
 Recent hire 1Recent hire 2Recent hire 3
-118 hired this month
+2160 hired this month
 
-$0-$100
+$23-$30
 per hour
 Mercor logo
 Posted by Mercor
@@ -18,65 +18,38 @@ mercor.com
 
 
 
-Location: Remote (must have access to a physical Mac)
+Role Overview
+Mercor is collaborating with a leading AI lab to contract detail-oriented generalists for a data annotation project. Contractors will support the development of AI systems by categorizing and labeling diverse datasets using predefined taxonomies. The project offers an opportunity to directly contribute to the accuracy, reliability, and performance of next-generation AI models.
 
-Fluent Language Skills Required: English
+Key Responsibilities
+Synthesize information from large volumes of data
 
-Why This Role Exists
+Annotate and categorize text, images, and other data according to detailed guidelines
 
-Mercor is supporting a high-priority data collection initiative aimed at improving how AI systems understand complex software interfaces and real-world, multi-step workflows. Current datasets lack the fidelity and expert grounding needed to reflect authentic professional software usage. This project addresses that gap by collecting high-quality screen annotations and screen recordings performed by experienced domain experts working in real digital environments.
+Apply predefined rubrics and taxonomies to produce structured, high-quality outputs
 
-What You’ll Do
+Flag inconsistencies, ambiguities, or errors in datasets
 
-Depending on the task phase, you may be asked to complete one or both of the following:
+Contribute to the improvement of AI systems through consistent annotation work
 
-Record screen sessions demonstrating specific tasks, accompanied by clear verbal narration explaining each step
+Ideal Qualifications
+Ability to synthesize complex or high-volume information into structured formats
 
-Annotate screenshots of professional software by drawing precise bounding boxes around relevant UI elements
+Strong critical reasoning, reading comprehension, and written communication skills
 
-Follow provided staging instructions to set up specific UI states prior to recording
+Prior experience applying rubrics, taxonomies, or standardized guidelines (preferred but not required)
 
-Use a custom capture tool to record workflows accurately and consistently
+A college degree and experience with data annotation projects
 
-Adhere closely to task guidelines to ensure data quality and usability
+More About the Opportunity
+Expected commitment: ~20 hours/week
+Application Process
+Submit your resume to begin
 
-Who You Are
+Complete a Training Assessment
 
-You have strong familiarity with professional software tools used in your domain including:
-
-AutoCAD Mechanical
-
-SolidWorks
-
-Inventor
-
-Vivado
-
-You are detail-oriented and capable of following precise instructions
-
-You are comfortable working independently and meeting tight deadlines
-
-You have access to a physical Mac and can create a fresh macOS user profile if required
-
-Nice-to-Have
-
-Prior experience with data collection, annotation, or QA work
-
-Experience recording or documenting workflows
-
-Comfort working with new tools and staged environments
-
-What Success Looks Like
-
-Screen annotations are precise, consistent, and aligned with guidelines
-
-Screen recordings accurately capture realistic, expert workflows
-
-Tasks are completed efficiently while maintaining high quality
-
-Collected data is usable at scale for downstream AI research and development
-
-We consider all qualified applicants without regard to legally protected characteristics and provide reasonable accommodations upon request."""
+We consider all qualified applicants without regard to legally protected characteristics and provide reasonable accommodations upon request.
+"""
 
 response = client.embeddings.create(
     model="text-embedding-3-small",
