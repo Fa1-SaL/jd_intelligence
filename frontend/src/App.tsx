@@ -22,12 +22,15 @@ export default function App() {
     setError(null);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/parse-jd", {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/parse-jd`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ raw_jd: rawJd, url: jobUrl })
+        body: JSON.stringify({
+          raw_jd: rawJd,
+          url: jobUrl
+        })
       });
 
       const data = await res.json();
