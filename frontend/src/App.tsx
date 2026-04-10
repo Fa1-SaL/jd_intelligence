@@ -1,13 +1,68 @@
 import { useState, useRef } from 'react';
 
+function splitParts(text: string) {
+  if (!text) return { prefix: "", suffix: "" };
+  const parts = text.split("|");
+  return {
+    prefix: parts[0]?.trim() || "",
+    suffix: parts.slice(1).join("|").trim()
+  };
+}
+
 export default function App() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [client, setClient] = useState('mercor');
   const [jobUrl, setJobUrl] = useState('');
   const [rawJd, setRawJd] = useState('');
   const [structuredJd, setStructuredJd] = useState('');
   const [emailTemplate, setEmailTemplate] = useState('');
   const [suggestedTitles, setSuggestedTitles] = useState('');
+  const [subject, setSubject] = useState('');
+  const [linkedinTitle, setLinkedinTitle] = useState('');
+  const [skills, setSkills] = useState<string[]>([]);
+  const [jobFunctions, setJobFunctions] = useState<string[]>([]);
+  const [industries, setIndustries] = useState<string[]>([]);
+  const [mirrorSync, setMirrorSync] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStep, setLoadingStep] = useState("");
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (text) await navigator.clipboard.writeText(text);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSubjectChange = (e: any) => {
+    const val = e.target.value;
+    setSubject(val);
+    if (mirrorSync) {
+      const { prefix: newPrefix } = splitParts(val);
+      if (!newPrefix) return;
+      setLinkedinTitle(prev => {
+        if (!prev) return prev;
+        const { prefix: oldPrefix, suffix } = splitParts(prev);
+        if (oldPrefix === newPrefix) return prev;
+        return suffix ? `${newPrefix} | ${suffix}` : newPrefix;
+      });
+    }
+  };
+
+  const handleLinkedinChange = (e: any) => {
+    const val = e.target.value;
+    setLinkedinTitle(val);
+    if (mirrorSync) {
+      const { prefix: newPrefix } = splitParts(val);
+      if (!newPrefix) return;
+      setSubject(prev => {
+        if (!prev) return prev;
+        const { prefix: oldPrefix, suffix } = splitParts(prev);
+        if (oldPrefix === newPrefix) return prev;
+        return suffix ? `${newPrefix} | ${suffix}` : newPrefix;
+      });
+    }
+  };
 
   const jdRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLDivElement>(null);
@@ -20,6 +75,15 @@ export default function App() {
 
     setStep(2);
     setError(null);
+    setLoadingStep("Analyzing job description...");
+
+    const t1 = setTimeout(() => {
+      setLoadingStep("Extracting key insights...");
+    }, 1200);
+
+    const t2 = setTimeout(() => {
+      setLoadingStep("Generating structured output...");
+    }, 2400);
 
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL}/parse-jd`, {
@@ -29,7 +93,8 @@ export default function App() {
         },
         body: JSON.stringify({
           raw_jd: rawJd,
-          url: jobUrl
+          url: jobUrl,
+          client: client
         })
       });
 
@@ -38,9 +103,18 @@ export default function App() {
       setStructuredJd(data.jd || "");
       setEmailTemplate(data.email || "");
       setSuggestedTitles((data.titles || []).join("\n"));
+      setSubject(data.subject || "");
+      setLinkedinTitle(data.linkedin_title || "");
+      setSkills(data.skills || []);
+      setJobFunctions(data.job_functions || []);
+      setIndustries(data.industries || []);
 
+      clearTimeout(t1);
+      clearTimeout(t2);
       setStep(3);
     } catch (err: any) {
+      clearTimeout(t1);
+      clearTimeout(t2);
       setError(err.message || "Error processing your request.");
       setStep(1);
     }
@@ -93,20 +167,33 @@ export default function App() {
       <main className="main-content">
 
         {step === 1 && (
-          <div className="wizard-input-view">
+          <div className="wizard-input-view animate-fade-in">
             <div className="hero">
               <h1>Define Your Search</h1>
               <p>Paste the job description below to begin the structural analysis<br />of role requirements and latent expectations.</p>
             </div>
 
             <div className="card form-card">
+              <label className="input-label">CLIENT</label>
+              <div className="input-with-icon" style={{ marginBottom: "24px" }}>
+                <select
+                  className="input-field-clean"
+                  value={client}
+                  onChange={(e: any) => setClient(e.target.value)}
+                  style={{ width: "100%", appearance: "auto" }}
+                >
+                  <option value="mercor">Mercor</option>
+                  <option value="micro1">Micro1</option>
+                </select>
+              </div>
+
               <label className="input-label">JOB LINK (REFERRAL)</label>
               <div className="input-with-icon" style={{ marginBottom: "24px" }}>
                 <LinkIcon />
                 <input
                   type="text"
                   className="input-field-clean"
-                  placeholder="https://linkedin.com/jobs/view/..."
+                  placeholder="Carefully enter the job link..."
                   value={jobUrl}
                   onChange={(e) => setJobUrl(e.target.value)}
                 />
@@ -115,7 +202,7 @@ export default function App() {
               <label className="input-label">PASTE RAW JOB DESCRIPTION</label>
               <textarea
                 className="input-field-clean textarea-large"
-                placeholder="Copy and paste the full description here..."
+                placeholder="Paste the full description here..."
                 value={rawJd}
                 onChange={(e) => setRawJd(e.target.value)}
               />
@@ -135,34 +222,59 @@ export default function App() {
               </div>
             </div>
 
-            <div className="version-label">V1.5 (PROTOTYPE)</div>
+            <div className="version-label">V1 ALPHA</div>
           </div>
         )}
 
         {step === 2 && (
           <div className="wizard-processing-view">
-            <h2>Processing...</h2>
-            <p>Architectural analysis in progress</p>
+            <div className="loading-container">
+              <p className="loading-text">{loadingStep}<span className="dot-flashing"></span></p>
+            </div>
           </div>
         )}
 
         {step === 3 && (
-          <div className="wizard-output-view">
+          <div className="wizard-output-view animate-fade-in">
 
             <div className="output-col-left">
               <div className="output-section">
                 <div className="section-header">
                   <div>
                     <h3>Outreach Email</h3>
-
                   </div>
                   <div className="header-actions">
-                    <button className="btn-ghost-box"><EditIcon /> Edit</button>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer', marginRight: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={mirrorSync}
+                        onChange={(e) => setMirrorSync(e.target.checked)}
+                        style={{ marginRight: '6px' }}
+                      />
+                      Mirror Prefix
+                    </label>
                     <button className="btn-primary-box" onClick={() => copyHtml(emailTemplate)}>
                       <CopyIcon /> Copy Template
                     </button>
                   </div>
                 </div>
+
+                {subject && (
+                  <div style={{ marginBottom: "16px", padding: "12px 16px", backgroundColor: "#f8f9fa", borderRadius: "8px", border: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ flex: 1, marginRight: "16px" }}>
+                      <div className="mini-title" style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px" }}>SUBJECT LINE</div>
+                      <input
+                        value={subject}
+                        onChange={handleSubjectChange}
+                        style={{ width: "100%", border: "none", background: "transparent", fontWeight: 600, color: "#0f172a", outline: "none", fontSize: "15px", fontFamily: "inherit" }}
+                      />
+                    </div>
+                    <button className="btn-ghost-box" onClick={() => copyToClipboard(subject)} title="Copy Subject">
+                      <CopyIcon /> Copy
+                    </button>
+                  </div>
+                )}
+
                 <div className="card output-card">
                   <div
                     className="rich-text-content"
@@ -177,15 +289,29 @@ export default function App() {
                 <div className="section-header">
                   <div>
                     <h3>Job Description</h3>
-
                   </div>
                   <div className="header-actions">
-                    <button className="btn-ghost-box"><EditIcon /> Edit</button>
                     <button className="btn-primary-box" onClick={() => copyHtml(structuredJd)}>
                       <CopyIcon /> Copy JD
                     </button>
                   </div>
                 </div>
+
+                {linkedinTitle && (
+                  <div style={{ marginBottom: "16px", padding: "12px 16px", backgroundColor: "#f8f9fa", borderRadius: "8px", border: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ flex: 1, marginRight: "16px" }}>
+                      <div className="mini-title" style={{ fontSize: "11px", color: "#64748b", marginBottom: "4px" }}>LINKEDIN TITLE</div>
+                      <input
+                        value={linkedinTitle}
+                        onChange={handleLinkedinChange}
+                        style={{ width: "100%", border: "none", background: "transparent", fontWeight: 600, color: "#0f172a", outline: "none", fontSize: "15px", fontFamily: "inherit" }}
+                      />
+                    </div>
+                    <button className="btn-ghost-box" onClick={() => copyToClipboard(linkedinTitle)} title="Copy LinkedIn Title">
+                      <CopyIcon /> Copy
+                    </button>
+                  </div>
+                )}
                 <div className="card output-card">
                   <div
                     className="rich-text-content"
@@ -198,20 +324,55 @@ export default function App() {
             </div>
 
             <div className="output-col-right">
-              <div className="card gray-card">
-                <div className="mini-title">SUGGESTED TITLES</div>
-                <ul className="bullet-list">
-                  {suggestedTitles.split("\n").filter(Boolean).map((t, i) => (
-                    <li key={i}>{t.replace(/^- /, '').trim()}</li>
+              <div className="card gray-card" style={{ padding: "24px" }}>
+                <div className="mini-title" style={{ marginBottom: "12px" }}>SUGGESTED TITLES (TAP TO COPY)</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {suggestedTitles.split("\n").filter(Boolean).map((t: string, i: number) => (
+                    <div key={i} className="clickable-pill" onClick={() => copyToClipboard(t.replace(/^- /, '').trim())} title="Copy Title">
+                      {t.replace(/^- /, '').trim()}
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
 
-              <div className="card dashed-placeholder">
-                <div className="placeholder-icon"><BriefcaseIcon /></div>
-                <h4>SIMILAR JOBS</h4>
-                <p>No matches found for the<br />current JD profile.</p>
-              </div>
+              {jobFunctions && jobFunctions.length > 0 && (
+                <div className="card gray-card" style={{ marginTop: "16px", padding: "24px" }}>
+                  <div className="mini-title" style={{ marginBottom: "12px" }}>JOB FUNCTIONS (TAP TO COPY)</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {jobFunctions.map((s: string, i: number) => (
+                      <div key={i} className="clickable-pill" onClick={() => copyToClipboard(s)} title="Copy Function">
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {industries && industries.length > 0 && (
+                <div className="card gray-card" style={{ marginTop: "16px", padding: "24px" }}>
+                  <div className="mini-title" style={{ marginBottom: "12px" }}>INDUSTRIES (TAP TO COPY)</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {industries.map((s: string, i: number) => (
+                      <div key={i} className="clickable-pill" onClick={() => copyToClipboard(s)} title="Copy Industry">
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {skills && skills.length > 0 && (
+                <div className="card gray-card" style={{ marginTop: "16px", padding: "24px" }}>
+                  <div className="mini-title" style={{ marginBottom: "12px" }}>TARGET SKILLS (TAP TO COPY)</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {skills.map((s: string, i: number) => (
+                      <div key={i} className="clickable-pill" onClick={() => copyToClipboard(s)} title="Copy Skill">
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

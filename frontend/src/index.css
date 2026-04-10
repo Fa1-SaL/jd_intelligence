@@ -431,3 +431,58 @@ body {
   color: var(--text-muted);
   line-height: 1.5;
 }
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dot-flashing {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.loading-text {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-light);
+  text-align: center;
+}
+
+.dot-flashing::after {
+  content: '';
+  animation: dot-flashing 1.5s infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.clickable-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  background-color: #e2e8f0;
+  color: #334155;
+  border-radius: 16px;
+  font-size: 0.825rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  transition: all 0.2s ease;
+}
+.clickable-pill:hover {
+  background-color: #cbd5e1;
+  color: #0f172a;
+}
+

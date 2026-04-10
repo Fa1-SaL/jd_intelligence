@@ -3,6 +3,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from llm_jd_parser import get_valid_llm_output
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
@@ -19,6 +24,7 @@ from typing import Optional
 class JDRequest(BaseModel):
     raw_jd: str
     url: Optional[str] = None
+    client: str = "mercor"
 
 
 def clean_input(text: str) -> str:
@@ -55,16 +61,13 @@ def parse_jd(request: JDRequest):
 
         print("Calling LLM...")
 
-        data, jd, email, titles = get_valid_llm_output(raw, url=request.url)
+        parsed_result = get_valid_llm_output(raw, url=request.url, client=request.client)
 
         print("LLM finished")
 
         return {
             "success": True,
-            "jd": jd,
-            "email": email,
-            "titles": titles,
-            "structured_data": data
+            **parsed_result
         }
 
     except Exception as e:

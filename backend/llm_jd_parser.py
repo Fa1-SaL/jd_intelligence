@@ -2,11 +2,14 @@ import os
 import json
 import re
 import time
+from pathlib import Path
 from typing import Tuple, Any, Dict, List
 from openai import OpenAI
 from dotenv import load_dotenv
 
-load_dotenv()
+# Explicitly load .env from the project root (one level above this file's backend/ folder)
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path, override=True)
 
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
@@ -33,11 +36,16 @@ OUTPUT_SCHEMA = {
     "client": "",
     "client_desc": "",
     "link": "",
-    "suggested_titles": []
+    "suggested_titles": [],
+    "subject": "",
+    "linkedin_title": "",
+    "skills": [],
+    "job_functions": [],
+    "industries": []
 }
 
 # 2. generate_llm_output
-def generate_llm_output(raw_jd: str) -> str:
+def generate_llm_output(raw_jd: str, client_name: str = "mercor") -> str:
     """Takes a raw JD, sends to LLM, returns raw JSON response text."""
     
     prompt = """
@@ -60,10 +68,15 @@ Expected JSON structure:
   "requirements": [],
   "role_overview": "",
   "who_this_is_for": "",
-  "client": "default Mercor unless specified",
+  "client": "{CLIENT_NAME}",
   "client_desc": "short company description",
   "link": "application/referral link if available",
-  "suggested_titles": []
+  "suggested_titles": [],
+  "subject": "",
+  "linkedin_title": "",
+  "skills": [],
+  "job_functions": ["", "", ""],
+  "industries": ["", "", ""]
 }
 
 Rules:
@@ -165,9 +178,38 @@ Bad:
 "Senior AI Evaluator"
 "Generalist Analyst"
 
+SUBJECT RULES:
+Format: {role} | $X/hr Remote | {CLIENT_NAME} x AI Labs
+Remove pay if missing
+Do not mention Remote if role is not remote
+
+SKILLS RULES:
+- Return EXACTLY 4-5 skills.
+- Skills must be BROAD, SEARCHABLE, industry-standard terms that recruiters type into LinkedIn.
+- Each skill must be 1-3 words MAX.
+- NO soft skills (e.g., communication, teamwork).
+- NO niche or descriptive phrases (e.g., "STEM problem-solving", "AI-driven analysis").
+- NO verbs or verb phrases.
+- Do NOT repeat the role title.
+Good examples: Python, SQL, Data Analysis, Machine Learning, Financial Modeling, Project Management, UX Design
+Bad examples: Bilingual Communication, AI-Driven Analysis, STEM Problem-Solving
+
+JOB FUNCTIONS RULES:
+Select EXACTLY 3 from this EXACT list — copy the values verbatim, no modifications:
+Accounting & Auditing, Administrative, Advertising, Analytics, Customer Service, Design, Education, Engineering, Finance, General Business, Health care provider, Human Resources, IT, Legal, Manufacturing, Marketing, Product Management, Project Management, Public Relations, Research, Sales, Strategy/Planning, Training, Consulting, Writing/Editing, Art/Creative
+DO NOT invent new values. DO NOT rephrase. Choose based on role responsibilities, not just the job title.
+
+INDUSTRIES RULES:
+Select EXACTLY 3 from this EXACT list — copy the values verbatim, no modifications:
+Accommodation and Food Services, Administrative and Support Services, Construction, Consumer Services, Education, Entertainment Providers, Farming, Ranching, Forestry, Financial Services, Government Administration, Holding Companies, Hospitals and Health Care, Manufacturing, Oil, Gas, and Mining, Professional Services, Real Estate and Equipment Rental Services, Retail, Technology, Information and Media, Transportation, Logistics, Supply Chain and Storage, Utilities, Wholesale, Research Services, Investment Management, Translation and Localization, Strategic Management Services, Information Services, Higher Education, Primary and Secondary Education, Medical Practices
+DO NOT invent new values. DO NOT rephrase. Choose based on the industry context of the role.
+
 Job Description:
 """ + raw_jd
 
+    prompt = prompt.replace("{CLIENT_NAME}", client_name.capitalize())
+
+    _t0 = time.time()
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -176,6 +218,7 @@ Job Description:
         ],
         temperature=0.0
     )
+    print(f"[LLM] Response time: {time.time() - _t0:.2f}s")
     
     return response.choices[0].message.content
 
@@ -186,6 +229,89 @@ def normalize_client(client: str) -> str:
     if not client or "default" in client.lower():
         return "Mercor"
     return client.strip()
+
+VALID_JOB_FUNCTIONS = [
+    "Accounting & Auditing", "Administrative", "Advertising", "Analytics",
+    "Customer Service", "Design", "Education", "Engineering", "Finance",
+    "General Business", "Health care provider", "Human Resources", "IT",
+    "Legal", "Manufacturing", "Marketing", "Product Management",
+    "Project Management", "Public Relations", "Research", "Sales",
+    "Strategy/Planning", "Training", "Consulting", "Writing/Editing",
+    "Art/Creative"
+]
+
+VALID_INDUSTRIES = [
+    "Accommodation and Food Services", "Administrative and Support Services",
+    "Construction", "Consumer Services", "Education", "Entertainment Providers",
+    "Farming, Ranching, Forestry", "Financial Services", "Government Administration",
+    "Holding Companies", "Hospitals and Health Care", "Manufacturing",
+    "Oil, Gas, and Mining", "Professional Services",
+    "Real Estate and Equipment Rental Services", "Retail",
+    "Technology, Information and Media",
+    "Transportation, Logistics, Supply Chain and Storage", "Utilities",
+    "Wholesale", "Research Services", "Investment Management",
+    "Strategic Management Services", "Information Services", "Higher Education",
+    "Primary and Secondary Education", "Medical Practices",
+    "Translation and Localization"
+]
+
+def clean_category_list(items, valid_list):
+    """Validates items against valid_list (exact match). Falls back to keyword overlap if < 3 match."""
+    if not isinstance(items, list): return []
+    cleaned = []
+    for i in items:
+        i_str = str(i).strip().lower()
+        for v in valid_list:
+            if v.lower() == i_str:
+                if v not in cleaned:
+                    cleaned.append(v)
+                break
+    
+    # Failsafe: fill remaining slots via keyword-overlap scoring
+    if len(cleaned) < 3:
+        scored = []
+        items_combined = " ".join(str(i).lower() for i in items)
+        for v in valid_list:
+            if v in cleaned:
+                continue
+            keywords = re.split(r'[\s,/&]+', v.lower())
+            score = sum(1 for k in keywords if k and k in items_combined)
+            if score > 0:
+                scored.append((score, v))
+        scored.sort(key=lambda x: -x[0])
+        for _, v in scored:
+            if v not in cleaned:
+                cleaned.append(v)
+            if len(cleaned) >= 3:
+                break
+    
+    return cleaned[:3]
+
+_SKILL_VERB_PREFIXES = (
+    "using ", "leveraging ", "applying ", "developing ", "building ",
+    "creating ", "managing ", "driving ", "analyzing ", "designing "
+)
+
+def clean_skills(skills: list, role: str = "") -> list:
+    """Post-filter LLM skills: remove niche, verbose, or role-repeating entries."""
+    role_lower = role.lower()
+    cleaned = []
+    for s in skills:
+        s = s.strip()
+        if not s:
+            continue
+        # Drop if more than 3 words
+        if len(s.split()) > 3:
+            continue
+        # Drop if starts with a verb phrase
+        s_lower = s.lower()
+        if any(s_lower.startswith(p) for p in _SKILL_VERB_PREFIXES):
+            continue
+        # Drop if it's basically just the role title
+        if s_lower == role_lower:
+            continue
+        cleaned.append(s)
+    return cleaned[:5]
 
 def normalize_commitment(commitment: str) -> str:
     if not commitment:
@@ -228,14 +354,8 @@ def clean_experience_phrases(text: str) -> str:
 
 def normalize_role(role: str) -> str:
     if not role: return role
-    role = role.strip()
-    replacements = {
-        "Expert": "Specialist",
-        "expert": "specialist"
-    }
-    for k, v in replacements.items():
-        role = role.replace(k, v)
-    return role
+    # ONLY clean whitespace, do not truncate brackets or simplify items
+    return " ".join(role.split())
 
 def normalize_requirements(requirements: List[str]) -> List[str]:
     cleaned = []
@@ -335,7 +455,7 @@ def normalize_data(data: dict) -> dict:
     data["role_responsibilities"] = filter_responsibilities(unique_resps)
 
     # Apply text artifact cleaner
-    data["requirements"] = [clean_text_artifacts(r) for r in data["requirements"]]
+    data["requirements"] = [clean_requirement_text(clean_text_artifacts(r)) for r in data["requirements"]]
     data["role_responsibilities"] = [clean_text_artifacts(r) for r in data["role_responsibilities"]]
 
     # Apply safety fallbacks
@@ -381,6 +501,28 @@ def clean_text_artifacts(text: str) -> str:
     text = re.sub(r'\s+,', ',', text)
     text = re.sub(r',\s+', ', ', text)
     return text.strip()
+
+def clean_requirement_text(text: str) -> str:
+    if not text:
+        return ""
+    prefixes = [
+        "candidates should ",
+        "candidates must ",
+        "the candidate should ",
+        "the candidate must ",
+        "you should ",
+        "you must "
+    ]
+    t = str(text).strip()
+    lower = t.lower()
+    for p in prefixes:
+        if lower.startswith(p):
+            t = t[len(p):].strip()
+            break
+            
+    if t:
+        t = t[0].upper() + t[1:]
+    return t
 
 def remove_inline_geography(text: str) -> str:
     if not text:
@@ -464,6 +606,76 @@ def clean_titles(titles: List[str], role: str) -> List[str]:
     return cleaned[:5]
 
 
+def extract_raw_role(raw_jd: str) -> str:
+    for line in raw_jd.split('\n'):
+        line = line.strip()
+        if line:
+            return line
+    return ""
+
+def extract_pay_info(pay_str: str):
+    if not pay_str:
+        return 0.0, "", ""
+    
+    pay_str_lower = str(pay_str).lower()
+    unit = ""
+    if "hour" in pay_str_lower or "/hr" in pay_str_lower:
+        unit = "/hr"
+    elif "month" in pay_str_lower or "/mo" in pay_str_lower:
+        unit = "/month"
+    elif "year" in pay_str_lower or "annu" in pay_str_lower or "/yr" in pay_str_lower:
+        unit = "/year"
+    elif "week" in pay_str_lower or "/wk" in pay_str_lower:
+        unit = "/week"
+        
+    matches = re.findall(r'\d+(?:\.\d+)?(?:[kKmM])?', str(pay_str).replace(',', ''))
+    max_numeric = 0.0
+    formatted_max = ""
+    for m in matches:
+        num_str = m.upper().replace('K', '').replace('M', '')
+        try:
+            val = float(num_str)
+            numeric_val = val
+            if 'K' in m.upper(): numeric_val *= 1000
+            if 'M' in m.upper(): numeric_val *= 1000000
+            
+            if numeric_val > max_numeric:
+                max_numeric = numeric_val
+                if 'K' in m.upper():
+                    formatted_max = str(int(val)) + "K" if val.is_integer() else str(val) + "K"
+                elif 'M' in m.upper():
+                    formatted_max = str(int(val)) + "M" if val.is_integer() else str(val) + "M"
+                else:
+                    formatted_max = str(int(val)) if val.is_integer() else str(val)
+        except:
+            pass
+            
+    return max_numeric, formatted_max, unit
+
+def generate_subject(role: str, formatted_max: str, unit: str, is_remote: bool, client_name: str) -> str:
+    client_display = "Micro1" if client_name.lower() == "micro1" else "Mercor"
+    middle_parts = []
+    if formatted_max:
+        middle_parts.append(f"${formatted_max}{unit}")
+    if is_remote:
+        middle_parts.append("Remote")
+    middle = " ".join(middle_parts)
+    if middle:
+        return f"{role} | {middle} | {client_display} x AI Labs"
+    return f"{role} | {client_display} x AI Labs"
+
+def generate_linkedin_title(role: str, numeric_max: float, formatted_max: str, unit: str, is_remote: bool) -> str:
+    middle_parts = []
+    if numeric_max > 0 and numeric_max <= 100:
+        middle_parts.append(f"${formatted_max}{unit}")
+    if is_remote:
+        middle_parts.append("Remote")
+    middle = " ".join(middle_parts)
+    if middle:
+        return f"{role} | {middle}"
+    return role
+
+
 def validate_schema(data: dict) -> Tuple[bool, Any]:
     required_keys = [
         "role", "type", "pay", "location", "commitment", 
@@ -495,11 +707,28 @@ def render_jd(data: dict) -> str:
 
     commitment = data.get("commitment", "").strip()
     commitment_line = f"<b>Commitment:</b> {commitment}<br>\n" if commitment else ""
+    client_name = data.get("client", "").strip().lower()
+
+    if client_name == "micro1":
+        pay_line = f"<b>Compensation:</b> {data['pay']}<br>\n" if data.get('pay') else ""
+        app_process = """<b>Application Process</b><br>
+<ul>
+<li>Easy Apply on LinkedIn</li>
+<li>Check email for next steps</li>
+<li>Participate in resume evaluation & interview stage</li>
+</ul>"""
+    else:
+        pay_line = f"<b>Compensation:</b> {data.get('pay', '')}<br>\n"
+        app_process = """<b>Application Process</b><br>
+<ul>
+<li>Upload resume</li>
+<li>Interview</li>
+<li>Submit form</li>
+</ul>"""
 
     jd_text = f"""<b>Position:</b> {data['role']}<br>
 <b>Type:</b> {data['type']}<br>
-<b>Compensation:</b> {data['pay']}<br>
-<b>Location:</b> {data['location']}<br>
+{pay_line}<b>Location:</b> {data['location']}<br>
 {commitment_line}
 <br>
 
@@ -515,12 +744,7 @@ def render_jd(data: dict) -> str:
 
 <br>
 
-<b>Application Process</b><br>
-<ul>
-<li>Upload resume</li>
-<li>Interview</li>
-<li>Submit form</li>
-</ul>
+{app_process}
 
 <br>
 
@@ -530,53 +754,65 @@ def render_jd(data: dict) -> str:
 def render_email(data: dict) -> str:
     client_name = data.get("client", "").strip().lower()
 
-    if "mercor" in client_name:
-        include_assessment_tab = True
-        include_playbook = True
+    if client_name == "micro1":
+        boost_section = """<li>
+You may also explore additional opportunities with <a href="https://refer.micro1.ai/referral/jobs?referralCode=463495f6-7cc6-49ed-8e8f-5ef2a1cc3fd7&utm_source=referral&utm_medium=share&utm_campaign=job_referral">Micro1</a>.
+</li>
+<li>
+For regular updates, you can follow our <a href="https://whatsapp.com/channel/0029Vb6eLrf23n3gz313El2h">WhatsApp channel</a> for upcoming openings.
+</li>"""
+        support_email = "support@micro1.ai"
+        pay_line = f"<b>Compensation:</b> {data['pay']}<br>\n" if data.get('pay') else ""
+        referral_partner = ""
+        app_process = """<b>Application process:</b><br>
+<ul>
+<li>Check email for next steps</li>
+<li>Participate in resume evaluation & interview stage</li>
+</ul><br>"""
     else:
-        include_assessment_tab = False
-        include_playbook = False
-
-    boost_items = []
-    if include_playbook:
+        boost_items = []
         boost_items.append("""<li>
 Need tips to improve your chances of selection? Check out the 
 <a href="https://docs.google.com/document/d/1xYe9X4t2Bv6BEScXwwvix35Kmlc92xiulEpBDLcCZb8/edit?usp=sharing">
 Interview Preparation Playbook
 </a>
 </li>""")
-    
-    if include_assessment_tab:
         boost_items.append("""<li>
 You can strengthen your profile through the 
 <a href="https://work.mercor.com/home?tab=assessments&referralCode=c88e7e37-c849-4793-a401-f58c8615e4c7">
 Assessment tab
 </a> in your dashboard. Completing skill based assessments can help unlock future opportunities, including roles you have not applied to or roles that may not be publicly listed.
 </li>""")
-    
-    boost_items.append("""<li>
+        boost_items.append("""<li>
 You may also explore additional opportunities with 
 <a href="https://t.mercor.com/cU1Py">Mercor</a> and 
 <a href="https://refer.micro1.ai/referral/jobs?referralCode=463495f6-7cc6-49ed-8e8f-5ef2a1cc3fd7&utm_source=referral&utm_medium=share&utm_campaign=job_referral">Micro1</a>, both platforms connecting skilled professionals to AI training projects.
 </li>""")
-    
-    boost_items.append("""<li>
+        boost_items.append("""<li>
 For regular updates, you can follow our 
 <a href="https://whatsapp.com/channel/0029Vb6eLrf23n3gz313El2h">WhatsApp channel</a> for upcoming openings.
 </li>""")
+        boost_section = "\n\n".join(boost_items)
+        support_email = "support@mercor.com"
+        pay_line = f"<b>Compensation:</b> {data.get('pay', '')}<br>\n"
+        referral_partner = f"<b>Referral Partner:</b> Crossing Hurdles<br>\n"
+        app_process = """<b>Application process:</b> (~20 Min)<br>
+<ul>
+<li>Upload resume</li>
+<li>Interview</li>
+<li>Submit form</li>
+</ul><br>"""
 
-    boost_section = "\n\n".join(boost_items)
-
-    support_email = data.get("client_email", "support@mercor.com")
+    pay_display = f" – {data['pay']}" if data.get('pay') else ""
+    apply_line = f"""<b>Apply asap (reviewed on a rolling basis):</b><br>
+<a href="{data['link']}">{data['role']}</a>{pay_display}<br><br>"""
 
     return f"""I’m from Crossing Hurdles, a global recruitment firm. We would like to refer you for an interesting opportunity that involves leveraging your expertise to train AI models.<br><br>
 
 <b>Organization:</b> {data['client']}<br>
-<b>Referral Partner:</b> Crossing Hurdles<br>
-<b>Role:</b> {data['role']}<br>
+{referral_partner}<b>Role:</b> {data['role']}<br>
 <b>Type:</b> {data['type']}<br>
-<b>Compensation:</b> {data['pay']}<br>
-<b>Location:</b> {data['location']}<br>
+{pay_line}<b>Location:</b> {data['location']}<br>
 <b>Apply Here:</b> <a href="{data['link']}">{data['role']}</a><br><br>
 
 <b>About {data['client']}:</b><br>
@@ -588,16 +824,8 @@ For regular updates, you can follow our
 <b>Who This Is For:</b><br>
 {data['who_this_is_for']}<br><br>
 
-<b>Application process:</b> (~20 Min)<br>
-<ul>
-<li>Upload resume</li>
-<li>Interview</li>
-<li>Submit form</li>
-</ul><br>
-
-<b>Apply asap (reviewed on a rolling basis):</b><br>
-<a href="{data['link']}">{data['role']}</a> – {data['pay']}<br><br>
-
+{app_process}
+{apply_line}
 <b>Take Steps to Boost Your Profile:</b>
 <ul>
 {boost_section}
@@ -611,11 +839,10 @@ P.S. We’re committed to addressing your queries, though responses may take lon
 
 
 # 5. Main wrapper
-def get_valid_llm_output(raw_jd: str, url: str = None) -> Tuple[Dict[str, Any], str, str, List[str]]:
-    """Returns (raw_json_data, rendered_jd, rendered_email, suggested_titles)"""
+def get_valid_llm_output(raw_jd: str, url: str = None, client: str = "mercor") -> dict:
     for attempt in range(3):
         start_time = time.time()
-        raw_resp = generate_llm_output(raw_jd)
+        raw_resp = generate_llm_output(raw_jd, client_name=client)
         print(f"[LLM TIME] {time.time() - start_time:.2f}s")
         
         try:
@@ -646,20 +873,42 @@ def get_valid_llm_output(raw_jd: str, url: str = None) -> Tuple[Dict[str, Any], 
                     ],
                     "role_overview": "Unable to generate overview due to parsing failure.",
                     "who_this_is_for": "Unable to determine target candidate profile.",
-                    "client": "Mercor",
-                    "client_desc": CLIENT_DESCRIPTIONS["Mercor"],
+                    "client": client.capitalize(),
+                    "client_desc": CLIENT_DESCRIPTIONS.get(client.capitalize(), ""),
                     "link": url if url else "",
-                    "suggested_titles": fallback_titles
+                    "suggested_titles": fallback_titles,
+                    "subject": "",
+                    "linkedin_title": "",
+                    "skills": []
                 }
         
                 jd_output = render_jd(fallback_data)
                 email_output = render_email(fallback_data)
+
+                print("Final role:", fallback_data["role"])
+                print("Subject:", fallback_data["subject"])
+                print("LinkedIn:", fallback_data["linkedin_title"])
         
-                return fallback_data, jd_output, email_output, fallback_titles
+                return {
+                    "jd": jd_output,
+                    "email": email_output,
+                    "subject": fallback_data["subject"],
+                    "linkedin_title": fallback_data["linkedin_title"],
+                    "skills": fallback_data["skills"],
+                    "job_functions": [],
+                    "industries": [],
+                    "version": "v2",
+                    "titles": fallback_titles,
+                    "structured_data": fallback_data
+                }
         
             continue
 
         # NORMALIZE BEFORE VALIDATION
+        raw_role = extract_raw_role(raw_jd)
+        if raw_role:
+            data["role"] = raw_role
+            
         data = normalize_data(data)
         
         # VALIDATE STRICTLY ON STRUCTURE ONLY
@@ -702,7 +951,40 @@ def get_valid_llm_output(raw_jd: str, url: str = None) -> Tuple[Dict[str, Any], 
 
             jd_output = render_jd(result)
             email_output = render_email(result)
-            return result, jd_output, email_output, result["suggested_titles"]
+
+            subject = result.get("subject", "")
+            linkedin_title = result.get("linkedin_title", "")
+            
+            # Ensure skills is a valid array of strings, post-filter niche/verbose entries
+            skills = result.get("skills", [])
+            if not isinstance(skills, list):
+                skills = []
+            skills = clean_skills([str(s).strip() for s in skills if str(s).strip()], result.get("role", ""))
+            
+            # Generate strict subject and linkedin_title based on verified raw data
+            max_numeric, formatted_max, unit = extract_pay_info(result.get("pay", ""))
+            subject = generate_subject(result["role"], formatted_max, unit, is_remote, result["client"])
+            linkedin_title = generate_linkedin_title(result["role"], max_numeric, formatted_max, unit, is_remote)
+            
+            job_functions = clean_category_list(result.get("job_functions", []), VALID_JOB_FUNCTIONS)
+            industries = clean_category_list(result.get("industries", []), VALID_INDUSTRIES)
+
+            print("Final role:", result["role"])
+            print("Subject:", subject)
+            print("LinkedIn:", linkedin_title)
+            
+            return {
+                "jd": jd_output,
+                "email": email_output,
+                "subject": subject,
+                "linkedin_title": linkedin_title,
+                "skills": skills,
+                "job_functions": job_functions,
+                "industries": industries,
+                "version": "v2",
+                "titles": result["suggested_titles"],
+                "structured_data": result
+            }
             
         else:
             print(f"[!] Validation failed on attempt {attempt+1}: {msg_or_data}")
@@ -759,19 +1041,19 @@ link - https://work.mercor.com/explore?listingId=list_AAABnSLJvfVX3RBDlENFN7tC
     
     print("--- Running Test ---")
     try:
-        data, jd, email, titles = get_valid_llm_output(sample_jd)
+        res = get_valid_llm_output(sample_jd, client="mercor")
         
         print("\n=== EXTRACTED STRUCTURED DATA (JSON) ===")
-        print(json.dumps(data, indent=2))
+        print(json.dumps(res["structured_data"], indent=2))
         
         print("\n=== RENDERED JD ===")
-        print(jd)
+        print(res["jd"])
         
         print("\n=== RENDERED EMAIL ===")
-        print(email)
+        print(res["email"])
         
         print("\n=== SUGGESTED TITLES ===")
-        print(json.dumps(titles, indent=2))
+        print(json.dumps(res["titles"], indent=2))
         
     except Exception as e:
         print(f"Error during test: {e}")
