@@ -19,7 +19,7 @@ client = OpenAI(api_key=api_key)
 
 CLIENT_DESCRIPTIONS = {
     "Mercor": "Mercor partners with leading AI labs and enterprises to train frontier AI models, offering competitive pay, collaboration with top researchers, and the opportunity to shape next generation AI systems using deep domain expertise.",
-    "Micro1": "Micro1 builds the human data and evaluation infrastructure that powers modern AI systems. The platform is trusted by frontier AI labs and Fortune 10 companies to embed real-world expert judgment directly into AI model training, evaluation, and feedback loops driving accuracy, safety, and performance at scale."
+    "Micro1": "Micro1 partners with AI labs and enterprises to train and improve foundational models and AI agents, offering advanced evaluation systems, reinforcement learning environments, and contextual monitoring tools to enhance LLM performance and real-world AI deployment."
 }
 
 # 1. Define OUTPUT_SCHEMA
