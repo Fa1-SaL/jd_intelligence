@@ -666,7 +666,7 @@ def generate_subject(role: str, formatted_max: str, unit: str, is_remote: bool, 
 
 def generate_linkedin_title(role: str, numeric_max: float, formatted_max: str, unit: str, is_remote: bool) -> str:
     middle_parts = []
-    if numeric_max > 0 and numeric_max <= 100:
+    if numeric_max > 0 and numeric_max <= 99:
         middle_parts.append(f"${formatted_max}{unit}")
     if is_remote:
         middle_parts.append("Remote")
