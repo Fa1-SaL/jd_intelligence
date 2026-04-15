@@ -139,44 +139,153 @@ WHO_THIS_IS_FOR RULES:
 Bad: "Candidates with expertise in finance"
 Good: "Professionals with hands-on experience in finance, accounting, law, or healthcare who have worked in analytical, advisory, or compliance roles and are comfortable evaluating complex outputs for accuracy and reasoning."
 
-SUGGESTED TITLES STRICT RULES:
-Generate exactly 5 job titles, ranked from best to worst (top = most optimal) inside the JSON list.
-1. Titles must be SHORT (4–7 words max before brackets).
-2. Use brackets for precision (format: Primary Title (Qualifier 1 & Qualifier 2)).
-3. The first 1–2 words must be the strongest keyword for search visibility.
-4. Avoid vague words like: Generalist, Operations, Executive.
-5. Avoid over-senior or misleading titles (e.g., Engineer, Scientist, Manager unless explicitly required).
-6. Do NOT include "AI" in the title unless explicitly instructed.
-7. Do NOT overstuff brackets (max 2 qualifiers).
-8. Titles must clearly signal the actual work being done (annotation, review, quality, analysis, etc.).
-9. Avoid overly generic titles like "Analyst" unless paired with a clear qualifier.
-10. Optimize for: high click-through rate, correct candidate targeting, minimal irrelevant applicants.
+CORE PRINCIPLE FOR TITLES
 
-BRACKETS USAGE (IMPORTANT):
-- Brackets are OPTIONAL, not mandatory.
-- Use brackets ONLY when they improve clarity or precision.
-- Do NOT use brackets if the base title is already clear.
+A job title must optimize for:
 
-ADDITIONAL TITLE GUIDANCE:
-- Assume this is for LinkedIn job posting optimization.
-- Prioritize titles that balance reach and relevance.
-- Penalize titles that attract the wrong talent pool.
-- Prefer "Annotation", "Review", "Quality", "Data" when applicable.
-- Before finalizing, internally evaluate each title: Does it attract the right candidate? Does it avoid misleading signals? Is it concise and searchable? Reject weak titles and only output high-quality options.
+Candidate relevance (attract the right people)
+Searchability (match how candidates describe themselves)
+Clarity (immediate understanding in <2 seconds)
+Market alignment (use real industry-standard phrasing)
 
-TITLE EXAMPLES:
-Good:
-"Response Evaluator (Finance & Compliance)"
-"Quality Reviewer (Legal & Accuracy)"
-"Content Analyst (Healthcare & Validation)"
-"Data Annotator (Finance & Reasoning)"
-"Output Reviewer (Domain & Quality)"
-"Sports Expert (Football)"
+Never prioritize creativity over accuracy.
 
-Bad:
-"AI Expert"
-"Senior AI Evaluator"
-"Generalist Analyst"
+TITLE DESIGN RULES
+1. ALWAYS MATCH THE ACTUAL WORK, NOT PERCEIVED SENIORITY
+Example:
+If the role is execution-heavy → use Developer / Engineer / Specialist
+If the role is analytical → use Analyst / Scientist
+If the role is creative-production → use Producer / Designer
+If the role is academic → use Professor / Researcher
+If the role is operational → use Specialist, not Engineer
+
+Do NOT inflate titles (avoid “Expert” unless truly required).
+
+2. TOOL OR DOMAIN MUST BE INCLUDED IF NICHE
+
+If the JD revolves around a specific tool, framework, or system:
+
+Include it explicitly in the title
+Format:
+Role – Tool
+Role (Tool)
+Tool-based Role
+
+Examples:
+
+C# Game Developer (MonoGame)
+Power Electronics Engineer – SPICE
+CAD Designer – Autodesk Inventor
+
+Do NOT dilute specificity (avoid “/ DAW”, “/ AI Model”, “/ Any Tool”).
+
+3. USE MARKET LANGUAGE, NOT INTERNAL LANGUAGE
+
+Avoid unnatural constructions such as:
+
+“Autodesk Inventor Designer”
+“AI Model Specialist”
+“Operating System Engineer (Usage)”
+
+Instead:
+
+Mechanical Designer – Autodesk Inventor
+Applied Data Scientist – AI
+Windows OS Specialist
+4. PRIORITIZE SEARCH KEYWORDS USED BY CANDIDATES
+
+Use titles candidates actually use on LinkedIn:
+
+GOOD:
+
+Game Developer
+Gameplay Programmer
+Audio Engineer
+Mechanical Design Engineer
+Econometrician
+
+BAD:
+
+Graphic Specialist (for programmers)
+Application Developer (for game roles)
+Economics Specialist (too broad)
+5. AVOID CROSS-DOMAIN CONFUSION
+
+Never mix unrelated audiences:
+
+Do NOT target Graphic Designers for programming roles
+Do NOT use Audio Engineer for music composition roles
+Do NOT use Data Analyst for ML-heavy roles
+Do NOT use Game Designer for engineering roles
+
+Each title must map to a clearly defined talent pool.
+
+6. TITLE LENGTH OPTIMIZATION
+
+Ideal title length:
+
+3–6 words preferred
+Max: 8 words
+
+If too long → reduce
+If too vague → add tool/domain
+
+7. USE STRUCTURED FORMATS
+
+Prefer these formats:
+
+Role – Tool
+Role (Tool)
+Domain Role
+Role – Domain
+
+Examples:
+
+AI/ML Engineer
+Generative AI Engineer
+Applied Data Scientist – AI
+MonoGame Game Developer
+Ardour Audio Engineer
+
+8. SIGNAL CORRECT SPECIALIZATION LEVEL
+
+Use modifiers carefully:
+
+Use “Senior” only if JD requires experience depth
+Use “Specialist” for tool/domain expertise
+Use “Engineer” only for technical/system-building roles
+Use “Producer” for creative workflow ownership
+Use “Consultant” for advisory roles
+
+9. ALIGN TITLE WITH RESPONSIBILITIES SIGNALS
+
+Map responsibilities → title:
+example:
+Coding + architecture → Engineer / Developer
+Modeling + ML → Data Scientist / ML Engineer
+Transcription + language → Linguist / Language Specialist
+CAD + manufacturing → Mechanical Designer / CAD Engineer
+Audio production → Audio Engineer / Producer
+Investigation → Criminal Investigator
+
+OUTPUT FORMAT
+
+Given a JD, produce 5 job titles
+BEST TITLE (single top recommendation)
+4-5 ALTERNATIVE TITLES (ranked)
+
+Keep output concise and decisive.
+
+ABSOLUTE RULES
+No inflated titles
+No mixed-domain targeting
+No internal jargon
+No unnecessary complexity
+
+If a title attracts the wrong audience, it is incorrect — even if technically accurate.
+
+ADDITIONAL INFORMATION:
+Do not use the keyword "AI" in the title unless absolutely necessary.
 
 SUBJECT RULES:
 Format: {role} | $X/hr Remote | {CLIENT_NAME} x AI Labs
