@@ -875,7 +875,6 @@ For regular updates, you can follow our <a href="https://whatsapp.com/channel/00
         referral_partner = ""
         app_process = """<b>Application process:</b><br>
 <ul>
-<li>Check email for next steps</li>
 <li>Participate in resume evaluation & interview stage</li>
 </ul><br>"""
     else:
@@ -916,7 +915,7 @@ For regular updates, you can follow our
     apply_line = f"""<b>Apply asap (reviewed on a rolling basis):</b><br>
 <a href="{data['link']}">{data['role']}</a>{pay_display}<br><br>"""
 
-    return f"""I’m from Crossing Hurdles, a global recruitment firm. We would like to refer you for an interesting opportunity that involves leveraging your expertise to train AI models.<br><br>
+    return f"""<br>I’m from Crossing Hurdles, a global recruitment firm. We would like to refer you for an interesting opportunity that involves leveraging your expertise to train AI models.<br><br>
 
 <b>Organization:</b> {data['client']}<br>
 {referral_partner}<b>Role:</b> {data['role']}<br>
