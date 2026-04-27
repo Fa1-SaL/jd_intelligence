@@ -1029,7 +1029,7 @@ def get_valid_llm_output(raw_jd: str, url: str = None, client: str = "mercor") -
                 type_lower = result.get("type", "").lower()
                 is_fulltime = "full-time" in type_lower or "full time" in type_lower or "fulltime" in type_lower
                 if not is_fulltime:
-                    result["commitment"] = "10-20 hrs/week"
+                    result["commitment"] = "10-40 hrs/week"
             else:
                 result["client_email"] = "support@mercor.com"
 
