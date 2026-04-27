@@ -426,28 +426,7 @@ def normalize_commitment(commitment: str) -> str:
     if not commitment:
         return ""
 
-    text = commitment.lower()
-
-    # PRIORITY: extract patterns tied to hours/week
-    patterns = [
-        r'(\d+)\s*[-–to]+\s*(\d+)\s*(hours|hrs)',
-        r'(\d+)\s*(hours|hrs)'
-    ]
-
-    # Try range first
-    match = re.search(patterns[0], text)
-    if match:
-        low = int(match.group(1))
-        high = int(match.group(2))
-        return f"~{low}–{high} hrs/week"
-
-    # Try single value
-    match = re.search(patterns[1], text)
-    if match:
-        val = int(match.group(1))
-        return f"~{val} hrs/week"
-
-    return ""
+    return "10-40 hrs/week"
 
 def clean_experience_phrases(text: str) -> str:
     if not text:
@@ -1044,6 +1023,13 @@ def get_valid_llm_output(raw_jd: str, url: str = None, client: str = "mercor") -
                 result["client_email"] = "support@mercor.com"
             elif result.get("client") == "Micro1":
                 result["client_email"] = "support@micro1.ai"
+                if result.get("type", "").strip().lower() == "contractor":
+                    result["type"] = "Contract"
+                    
+                type_lower = result.get("type", "").lower()
+                is_fulltime = "full-time" in type_lower or "full time" in type_lower or "fulltime" in type_lower
+                if not is_fulltime:
+                    result["commitment"] = "10-20 hrs/week"
             else:
                 result["client_email"] = "support@mercor.com"
 
